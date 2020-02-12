@@ -1,11 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os/exec"
 	"runtime"
-
-	_ "./statik"
 )
 
 // open opens the specified URL in the default browser of the user.
@@ -28,7 +27,11 @@ func open(url string) error {
 
 func main() {
 	router := newRouter()
+	theModel = InitializeModel()
+	fmt.Println("Model initialized")
 
+	// prod only
 	go open("http://localhost:8080")
 	http.ListenAndServe(":8080", router)
+	return
 }

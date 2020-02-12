@@ -8,16 +8,24 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/rakyll/statik/fs"
+
+	// prod only !!!
+	_ "./statik"
 )
 
-type msg struct {
-	Num int
+var alreadyConnected bool = false
+
+// Message the message
+type Message struct {
+	Name string      `json:"name"`
+	Data interface{} `json:"data"`
 }
 
 func newRouter() *mux.Router {
 	// Create the new router
 	r := mux.NewRouter()
 
+	// prod only !!
 	// Statik files management
 	statikFS, err := fs.New()
 	if err != nil {
@@ -27,36 +35,34 @@ func newRouter() *mux.Router {
 	h := http.FileServer(statikFS)
 
 	r.HandleFunc("/ws", wsHandler)
+
+	// Prod only !!
 	r.PathPrefix("/").Handler(h).Methods("GET")
 
 	return r
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
+	if alreadyConnected {
+		fmt.Println("You are already connected on a page, close it and try again")
+		http.Error(w, "", 403)
+		return
+	}
+
 	if r.Header.Get("Origin") != "http://"+r.Host {
 		http.Error(w, "Origin not allowed", 403)
 		return
 	}
+
 	conn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
 	if err != nil {
 		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
 	}
+	defer conn.Close()
 
-	go messangeHandling(conn)
-}
-
-func messangeHandling(conn *websocket.Conn) {
-	for {
-		m := msg{}
-
-		err := conn.ReadJSON(&m)
-		if err != nil {
-			fmt.Println("Error reading json.", err)
-		}
-
-		fmt.Printf("Got message: %#v\n", m)
-		if err = conn.WriteJSON(m); err != nil {
-			fmt.Println(err)
-		}
-	}
+	alreadyConnected = true
+	theModel.client = conn
+	go messangeHandling()
+	sendMessage(&Message{"settings change", theModel.Settings})
+	write()
 }

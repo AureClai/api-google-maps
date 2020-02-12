@@ -1,15 +1,27 @@
-ONEHSELL:
-PHONY:
+.ONESHELL:
+.PHONY: all
 
-clean-and-statik: clean statik
+all: clean yarn statik build run
+
+gobuild: cleango statik build run
+	
+yarn:
+	cd web && yarn build && cd ..
 
 statik:
-	cd web && yarn build && cd ..
 	statik -src=./web/build
 
-clean:
-	rm -rf ./statik
-	rm -rf ./web/build
+build:
+	go build -o ./bin/testStatik.exe
 
-go-build:
-	go build -o ./bin/macOSapp
+run:
+	./bin/testStatik.exe
+
+cleango:
+	rm ./statik -r -f
+	rm ./bin/*.exe -r -f
+
+clean:
+	rm ./web/build -r -f
+	rm ./statik -r -f
+	rm ./bin/*.exe -r -f
