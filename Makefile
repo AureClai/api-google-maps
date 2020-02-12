@@ -18,10 +18,10 @@ run:
 	./bin/testStatik.exe
 
 cleango:
-	rm ./statik -r -f
-	rm ./bin/*.exe -r -f
+	rm -r -f ./statik
+	rm -r -f ./bin/*.exe
 
 clean:
-	rm ./web/build -r -f
-	rm ./statik -r -f
-	rm ./bin/*.exe -r -f
+	rm -r -f ./web/build 
+	rm -r -f ./statik 
+	rm -r -f ./bin/*.exe 

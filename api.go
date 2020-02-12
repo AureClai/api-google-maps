@@ -64,14 +64,15 @@ func makeRequest() {
 	}
 
 	// Adding the proxy settings to the Transport object
-	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
+	transport := http.Transport{}
+	if theModel.Settings.Proxy != "" {
+		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 
 	// Client Initialisation
 	client := &http.Client{
 		Timeout:   10 * time.Second,
-		Transport: transport,
+		Transport: &transport,
 	}
 
 	// Generating the HTTP, GET request
