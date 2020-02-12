@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -15,6 +16,7 @@ type Model struct {
 	client   *websocket.Conn
 	send     chan Message
 	Settings *Settings
+	mu       sync.Mutex
 }
 
 // Parameter struct
@@ -138,8 +140,11 @@ func messangeHandling() {
 			fmt.Println("DO NOTHING !")
 		}
 
-		if err = theModel.client.WriteJSON(m); err != nil {
-			fmt.Println("here")
+		theModel.mu.Lock()
+		err = theModel.client.WriteJSON(m)
+		theModel.mu.Unlock()
+
+		if err != nil {
 			fmt.Println(err)
 			alreadyConnected = false
 			theModel.client = nil
@@ -156,9 +161,9 @@ func sendMessage(m *Message) {
 
 func write() {
 	for msg := range theModel.send {
-		fmt.Printf("Sending : %#v to %#v\n", msg, theModel.client)
-		// theModel.mu.Lock()
-		// defer theModel.mu.Unlock()
+		fmt.Printf("Sending : %#v \n", msg)
+		theModel.mu.Lock()
 		theModel.client.WriteJSON(msg)
+		theModel.mu.Unlock()
 	}
 }

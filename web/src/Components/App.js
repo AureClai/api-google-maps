@@ -1,20 +1,23 @@
 import React, { Component } from "react";
 import logo from "../img/Logo_Cerema.png";
+import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import Socket from "../socket.js";
+import SettingsComponent from "./Tabs/SettingsComponent.jsx";
+import RequestTab from "./Tabs/RequestTab.jsx";
+import ImportTab from "./Tabs/ImportTab";
 
 class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      connected: false,
+      connected: true,
       settings: {
         api_key: "",
         proxy: ""
-      }
+      },
+      currentTab: "Request"
     };
-    this.onChangeSettings = this.onChangeSettings.bind(this);
-    this.onTestRequest = this.onTestRequest.bind(this);
   }
 
   /*
@@ -56,19 +59,11 @@ class App extends Component {
 
   onConnect() {
     this.setState({ connected: true });
-    document.getElementById("api-key-input").disabled = false;
-    document.getElementById("proxy-input").disabled = false;
-    document.getElementById("settings-submit").disabled = false;
-    document.getElementById("request-test-button").disabled = false;
   }
 
   onDisconnect() {
     this.setState({ connected: false });
-    this.testLog("Deconnecté du Websocket... relancez l'appli", "FAIL");
-    document.getElementById("api-key-input").disabled = true;
-    document.getElementById("proxy-input").disabled = true;
-    document.getElementById("settings-submit").disabled = true;
-    document.getElementById("request-test-button").disabled = true;
+    this.testLog("Websocket déconnecté... Relancez l'application...", "FAIL");
     alert("Relancez l'application...");
   }
 
@@ -87,52 +82,72 @@ class App extends Component {
   }
 
   onReceiveSettingsInfo(data) {
-    document.getElementById("proxy-input").value = data["proxy"];
-    document.getElementById("api-key-input").value = data["api-key"];
+    const proxy = data["proxy"];
+    const api_key = data["api-key"];
+    this.setState({
+      settings: {
+        api_key: api_key,
+        proxy: proxy
+      }
+    });
+  }
+
+  /*
+    Tabs mangement
+  */
+  onClickParameters(e) {
+    this.setState({ currentTab: "Parameters" });
+  }
+
+  onClickRequest(e) {
+    this.setState({ currentTab: "Request" });
+  }
+
+  onClickImport(e) {
+    this.setState({ currentTab: "Import" });
   }
 
   render() {
+    var jsxTab;
+    if (this.state.currentTab === "Parameters") {
+      jsxTab = (
+        <SettingsComponent
+          {...this.state}
+          onChangeSettings={this.onChangeSettings.bind(this)}
+        />
+      );
+    } else if (this.state.currentTab === "Request") {
+      jsxTab = (
+        <RequestTab
+          {...this.state}
+          onTestRequest={this.onTestRequest.bind(this)}
+        />
+      );
+    } else if (this.state.currentTab === "Import") {
+      jsxTab = <ImportTab />;
+    }
+
     return (
       <div className="App">
-        <header className="App-header">
-          <h1>Cerema API Google</h1>
-          <img src={logo} className="App-logo" alt="logo" />
-          <form className="setting-form">
-            <label for="api-key-input">Clé API</label>
-            <br></br>
-            <input
-              type="text"
-              id="api-key-input"
-              placeholder="Ici, la clé API"
-              disabled
-            ></input>
-            <br></br>
-            <label for="proxy-input">Proxy</label>
-            <br></br>
-            <input
-              type="text"
-              id="proxy-input"
-              placeholder="Ici, le proxy"
-              disabled
-            ></input>
-            <br></br>
-            <button
-              onClick={this.onChangeSettings}
-              className="App-button"
-              id="settings-submit"
-            >
-              <span>Valider</span>
-            </button>
-          </form>
-          <button
-            onClick={this.onTestRequest}
-            className="App-button"
-            id="request-test-button"
-          >
-            <span>Tester une requête</span>
-          </button>
-          <div id="request-test" readOnly></div>
-        </header>
+        <nav className="navbar navbar-light bg-light">
+          <div id="cerema-brand">
+            <img src={logo} className="App-logo" alt="logo" />
+            <span className="navbar-brand h">Cerema API Google</span>
+          </div>
+        </nav>
+        <div className="container-fluid fill-height">
+          <div className="row flex-grow-1">
+            <div id="tabExplorer" className="col-1">
+              <li>
+                <ul onClick={this.onClickParameters.bind(this)}>Paramètres</ul>
+                <ul onClick={this.onClickImport.bind(this)}>Import</ul>
+                <ul onClick={this.onClickRequest.bind(this)}>Requête</ul>
+              </li>
+            </div>
+            {jsxTab}
+          </div>
+        </div>
+        <div id="request-test" readOnly></div>
       </div>
     );
   }
