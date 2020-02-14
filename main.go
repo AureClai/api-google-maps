@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // open opens the specified URL in the default browser of the user.
@@ -28,6 +30,8 @@ func open(url string) error {
 func main() {
 	router := newRouter()
 	theModel = InitializeModel()
+	theModel.DBController = initDBController()
+	defer theModel.DBController.Database.Close()
 	fmt.Println("Model initialized")
 
 	// prod only

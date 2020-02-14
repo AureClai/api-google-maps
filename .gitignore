@@ -4,3 +4,4 @@
 /web/node_modules
 
 parametres.json
+*.db

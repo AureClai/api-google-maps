@@ -120,6 +120,7 @@ func makeRequest() {
 	}
 
 	messagePayload := fmt.Sprintf("Requête OK entre %v et %v : %v sec", res.Origines[0], res.Destinations[0], res.Rows[0].Elements[0].DistanceInTraffic.Value)
+	go AddRecord(res)
 
 	// Sending response
 	sendMessage(&Message{

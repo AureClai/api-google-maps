@@ -13,10 +13,11 @@ import (
 
 // Model struct
 type Model struct {
-	client   *websocket.Conn
-	send     chan Message
-	Settings *Settings
-	mu       sync.Mutex
+	client       *websocket.Conn
+	send         chan Message
+	Settings     *Settings
+	mu           sync.Mutex
+	DBController *DBController
 }
 
 // Parameter struct
