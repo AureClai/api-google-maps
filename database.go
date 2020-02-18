@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"googlemaps.github.io/maps"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -70,13 +72,11 @@ func initDBController() *DBController {
 	}
 }
 
-func AddRecord(record *Result) {
+func AddRecord(record *maps.DistanceMatrixResponse) {
 	if theModel.DBController.Database != nil &&
-		theModel.DBController.AddRecordStatement != nil &&
-		theModel.DBController.AddPathStatement != nil {
-		go AddRow(record)
+		theModel.DBController.AddRecordStatement != nil {
 		theModel.mu.Lock()
-		_, err := theModel.DBController.AddRecordStatement.Exec(time.Now().Format("2006-01-02 15:04:05"), record.Rows[0].Elements[0].DistanceInTraffic.Value)
+		_, err := theModel.DBController.AddRecordStatement.Exec(time.Now().Format("2006-01-02 15:04:05"), record.Rows[0].Elements[0].DurationInTraffic.Seconds())
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -85,13 +85,13 @@ func AddRecord(record *Result) {
 	}
 }
 
-func AddRow(record *Result) {
+func AddRow(record *maps.DistanceMatrixResponse) {
 	theModel.mu.Lock()
 	// check if path exists in db
 	rows, _ := theModel.DBController.Database.Query(`SELECT * FROM paths WHERE paths.name=="path_0"`)
 	if !rows.Next() {
 		fmt.Println("Creating new path in DB")
-		theModel.DBController.AddPathStatement.Exec("path_0", record.Origines[0], record.Destinations[0], record.Rows[0].Elements[0].Duration.Value)
+		theModel.DBController.AddPathStatement.Exec("path_0", record.OriginAddresses[0], record.DestinationAddresses[0], record.Rows[0].Elements[0].Duration.Seconds())
 	}
 	theModel.mu.Unlock()
 }

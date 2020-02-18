@@ -2,6 +2,7 @@
 /bin/
 /web/build/
 /web/node_modules
+/.vscode
 
 parametres.json
 *.db

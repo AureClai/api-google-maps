@@ -1,36 +1,14 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
+
+	"googlemaps.github.io/maps"
 )
-
-// Structs
-type Result struct {
-	Destinations []string `json:"destination_addresses"`
-	Origines     []string `json:"origin_addresses"`
-	Statut       string   `json:"status"`
-	Rows         []Row    `json:"rows"`
-}
-
-type Row struct {
-	Elements []Element `json:"elements"`
-}
-
-type Element struct {
-	Distance          Entry  `json:"distance"`
-	Duration          Entry  `json:"duration"`
-	DistanceInTraffic Entry  `json:"duration_in_traffic"`
-	Statut            string `json:"status"`
-}
-
-type Entry struct {
-	Text  string `json:"text"`
-	Value int    `json:"value"`
-}
 
 // Request part
 func makeRequest() {
@@ -48,21 +26,6 @@ func makeRequest() {
 		return
 	}
 
-	// Creating the URL to loaded through the proxy
-	urlStr := "https://maps.googleapis.com/maps/api/distancematrix/json?origins=48.8840557,2.463851&destinations=48.8715895,2.4326677&departure_time=now&traffic_model=best_guess&key=" + theModel.Settings.APIKey
-	url, err := url.Parse(urlStr)
-	if err != nil {
-		fmt.Println(err)
-		sendMessage(&Message{
-			Name: "test callback",
-			Data: map[string]string{
-				"type":    "FAIL",
-				"message": "Erreur requête : Url invalide",
-			},
-		})
-		return
-	}
-
 	// Adding the proxy settings to the Transport object
 	transport := http.Transport{}
 	if theModel.Settings.Proxy != "" {
@@ -75,22 +38,32 @@ func makeRequest() {
 		Transport: &transport,
 	}
 
-	// Generating the HTTP, GET request
-	request, err := http.NewRequest("GET", url.String(), nil)
+	// Generating the request client
+	c, err := maps.NewClient(maps.WithAPIKey(theModel.Settings.APIKey), maps.WithHTTPClient(client))
 	if err != nil {
 		fmt.Println(err)
-
 		sendMessage(&Message{
 			Name: "test callback",
-			Data: "Erreur requête : Construction de la requête impossible",
+			Data: map[string]string{
+				"type":    "FAIL",
+				"message": "Erreur requête : Construction du client Maps impossible",
+			},
 		})
-		return
 	}
 
-	// calling the URL
-	r, err := client.Do(request)
+	r := &maps.DistanceMatrixRequest{
+		Origins:       []string{"48.8840557,2.463851"},
+		Destinations:  []string{"48.8715895,2.4326677"},
+		DepartureTime: "now",
+		Mode:          maps.TravelModeDriving,
+		Units:         maps.UnitsMetric,
+		TrafficModel:  maps.TrafficModelBestGuess,
+	}
+
+	response, err := c.DistanceMatrix(context.Background(), r)
 	if err != nil {
 		fmt.Println(err)
+
 		sendMessage(&Message{
 			Name: "test callback",
 			Data: map[string]string{
@@ -98,29 +71,11 @@ func makeRequest() {
 				"message": "Erreur requête : Impossible d'effectuer la requête (proxy ?)",
 			},
 		})
-		return
 	}
-	defer r.Body.Close()
+	fmt.Printf("Got : %#v\n", response)
 
-	// Init Results struct
-	res := new(Result)
-	json.NewDecoder(r.Body).Decode(res)
-
-	fmt.Printf("Got : %#v\n", res)
-
-	if res.Statut != "OK" {
-		sendMessage(&Message{
-			Name: "test callback",
-			Data: map[string]string{
-				"type":    "FAIL",
-				"message": "Erreur requête : " + res.Statut,
-			},
-		})
-		return
-	}
-
-	messagePayload := fmt.Sprintf("Requête OK entre %v et %v : %v sec", res.Origines[0], res.Destinations[0], res.Rows[0].Elements[0].DistanceInTraffic.Value)
-	go AddRecord(res)
+	messagePayload := fmt.Sprintf("Requête OK entre %v et %v : %v sec", response.OriginAddresses[0], response.DestinationAddresses[0], response.Rows[0].Elements[0].DurationInTraffic.Seconds())
+	go AddRecord(response)
 
 	// Sending response
 	sendMessage(&Message{
