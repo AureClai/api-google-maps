@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -137,6 +138,20 @@ func messangeHandling() {
 			theModel.printInfos()
 		case "test request":
 			go makeRequest()
+		case "add path":
+			go addNewPathToDatabase(m.Data)
+		case "remove path":
+			id, err := strconv.ParseInt((m.Data.(map[string]interface{}))["id"].(string), 10, 64)
+			if err != nil {
+				fmt.Println(err)
+			}
+			go removePath(int(id))
+		case "path map":
+			id, err := strconv.ParseInt((m.Data.(map[string]interface{}))["id"].(string), 10, 64)
+			if err != nil {
+				fmt.Println(err)
+			}
+			go sendPolyline(int(id))
 		default:
 			fmt.Println("DO NOTHING !")
 		}

@@ -26,9 +26,11 @@ func initDBController() *DBController {
 	statement, err := database.Prepare(`CREATE TABLE IF NOT EXISTS paths (
 		id INTEGER PRIMARY KEY,
 		name TEXT,
-		origin TEXT,
-		destination TEXT,
-		free_flow_travel_time INTEGER
+		origin_lat TEXT,
+		origin_long TEXT,
+		destination_lat TEXT,
+		destination_long TEXT,
+		polyline TEXT
 	)`)
 	if err != nil {
 		fmt.Println("Création de table chemins impossible")
@@ -60,10 +62,16 @@ func initDBController() *DBController {
 
 	addPathStatement, err := database.Prepare(`INSERT INTO paths (
 		name,
-		origin,
-		destination,
-		free_flow_travel_time
-		) VALUES (?, ?, ?, ?)`)
+		origin_lat,
+		origin_long,
+		destination_lat,
+		destination_long,
+		polyline
+		) VALUES (?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		fmt.Println("COnstruction Statement impossible")
+		fmt.Println(err)
+	}
 	fmt.Println("New Database created")
 	return &DBController{
 		Database:           database,
@@ -85,13 +93,127 @@ func AddRecord(record *maps.DistanceMatrixResponse) {
 	}
 }
 
-func AddRow(record *maps.DistanceMatrixResponse) {
-	theModel.mu.Lock()
-	// check if path exists in db
-	rows, _ := theModel.DBController.Database.Query(`SELECT * FROM paths WHERE paths.name=="path_0"`)
-	if !rows.Next() {
+func AddPath(infos *PathInfos, record []maps.Route) {
+	fmt.Printf("%v#\n", theModel.DBController)
+	if theModel.DBController.Database != nil &&
+		theModel.DBController.AddPathStatement != nil {
+
+		theModel.mu.Lock()
 		fmt.Println("Creating new path in DB")
-		theModel.DBController.AddPathStatement.Exec("path_0", record.OriginAddresses[0], record.DestinationAddresses[0], record.Rows[0].Elements[0].Duration.Seconds())
+		result, err := theModel.DBController.AddPathStatement.Exec(
+			infos.Name,
+			infos.Coordinates.Origin.Lat,
+			infos.Coordinates.Origin.Long,
+			infos.Coordinates.Destination.Lat,
+			infos.Coordinates.Destination.Long,
+			record[0].OverviewPolyline.Points,
+		)
+		if err != nil {
+			fmt.Println(err)
+		}
+		theModel.mu.Unlock()
+		idLast, err := result.LastInsertId()
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Printf("Correctly stored in DB - ID : %v", idLast)
+		infos.ID = int(idLast)
+		sendMessage(&Message{
+			Name: "add path",
+			Data: infos,
+		})
+		sendMessage(&Message{
+			Name: "test callback",
+			Data: map[string]string{
+				"type":    "SUCCESS",
+				"message": "Ajout de l'itinéraire résussi",
+			},
+		})
+	}
+}
+
+func sendAllPaths() {
+	allPaths := make([]PathInfos, 0)
+	theModel.mu.Lock()
+	rows, err := theModel.DBController.Database.Query(`SELECT
+	id,
+	name,
+	origin_lat,
+	origin_long,
+	destination_lat,
+	destination_long FROM paths`)
+	if err != nil {
+		fmt.Println(err)
+	}
+	var id int
+	var name, origin_lat, origin_long, destination_lat, destination_long string
+	theModel.mu.Unlock()
+
+	for rows.Next() {
+		rows.Scan(&id, &name, &origin_lat, &origin_long, &destination_lat, &destination_long)
+		pathInfos := PathInfos{ID: id, Name: name}
+		pathInfos.Coordinates.Origin.Lat = origin_lat
+		pathInfos.Coordinates.Origin.Long = origin_long
+		pathInfos.Coordinates.Destination.Lat = destination_lat
+		pathInfos.Coordinates.Destination.Long = destination_long
+		allPaths = append(allPaths, pathInfos)
+	}
+	sendMessage(&Message{
+		Name: "init paths",
+		Data: allPaths,
+	})
+}
+
+func removePath(id int) {
+	sqlStatement := `
+	DELETE FROM paths
+	WHERE id = $1;
+	`
+	theModel.mu.Lock()
+	_, err := theModel.DBController.Database.Exec(sqlStatement, id)
+	if err != nil {
+		fmt.Println(err)
+		theModel.mu.Unlock()
+		return
 	}
 	theModel.mu.Unlock()
+	sendMessage(&Message{
+		Name: "remove path",
+		Data: map[string]string{
+			"id": fmt.Sprintf("%v", id),
+		},
+	})
+	sendMessage(&Message{
+		Name: "test callback",
+		Data: map[string]string{
+			"type":    "SUCCESS",
+			"message": "Suppression de l'itinéraire résussie",
+		},
+	})
+
+}
+
+func sendPolyline(id int) {
+	sqlStatement := `
+	SELECT polyline
+	FROM paths
+	WHERE id = $1;
+	`
+	theModel.mu.Lock()
+	rows, err := theModel.DBController.Database.Query(sqlStatement, id)
+	if err != nil {
+		fmt.Println(err)
+	}
+	theModel.mu.Unlock()
+	if rows.Next() {
+		var encodedPolyline string
+		rows.Scan(&encodedPolyline)
+		sendMessage(&Message{
+			Name: "path map",
+			Data: convertToGeoJSON(encodedPolyline),
+		})
+	} else {
+		fmt.Println("ERROR ! no row ! 001")
+	}
+
 }

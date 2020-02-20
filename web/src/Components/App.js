@@ -16,7 +16,8 @@ class App extends Component {
         api_key: "",
         proxy: ""
       },
-      currentTab: "Request"
+      currentTab: "Import",
+      paths: []
     };
   }
 
@@ -45,6 +46,86 @@ class App extends Component {
 
   /*
 
+  Import tab
+
+  */
+
+  addNewPath(values) {
+    var { origLat, origLong, destLat, destLong, name } = values;
+    this.socket.emit("add path", {
+      name: name,
+      coordinates: {
+        origin: {
+          lat: origLat,
+          long: origLong
+        },
+        destination: {
+          lat: destLat,
+          long: destLong
+        }
+      }
+    });
+  }
+
+  importPaths(data) {
+    var paths = [];
+    for (var i = 0; i < data.length; i++) {
+      var path = data[i];
+      paths.push({
+        name: path.Name,
+        id: path.ID,
+        origLat: path.Coordinates.Origin.Lat,
+        origLong: path.Coordinates.Origin.Long,
+        destLat: path.Coordinates.Destination.Lat,
+        destLong: path.Coordinates.Destination.Long
+      });
+    }
+    console.log(paths);
+    this.setState({ paths: paths });
+  }
+
+  addPathFromDB(path) {
+    var { paths } = this.state;
+    paths.push({
+      name: path.Name,
+      id: path.ID,
+      origLat: path.Coordinates.Origin.Lat,
+      origLong: path.Coordinates.Origin.Long,
+      destLat: path.Coordinates.Destination.Lat,
+      destLong: path.Coordinates.Destination.Long
+    });
+    this.setState({ paths: paths });
+  }
+
+  askForRemovingPath(id) {
+    this.socket.emit("remove path", {
+      id: id
+    });
+  }
+
+  removePathFromDB(data) {
+    var { paths } = this.state;
+    var newPaths = [];
+    for (var i = 0; i < paths.length; i++) {
+      if (paths[i].id != data.id) {
+        newPaths.push(paths[i]);
+      }
+    }
+    this.setState({ paths: newPaths });
+  }
+
+  askForPathMap(id) {
+    this.socket.emit("path map", { id: id });
+  }
+
+  getPathMapFromDB(data) {
+    console.log(data);
+  }
+
+  /*
+
+
+
   */
 
   componentDidMount() {
@@ -55,6 +136,10 @@ class App extends Component {
     socket.on("disconnect", this.onDisconnect.bind(this));
     socket.on("settings change", this.onReceiveSettingsInfo.bind(this));
     socket.on("test callback", this.onTestCallback.bind(this));
+    socket.on("init paths", this.importPaths.bind(this));
+    socket.on("add path", this.addPathFromDB.bind(this));
+    socket.on("remove path", this.removePathFromDB.bind(this));
+    socket.on("path map", this.getPathMapFromDB.bind(this));
   }
 
   onConnect() {
@@ -64,7 +149,7 @@ class App extends Component {
   onDisconnect() {
     this.setState({ connected: false });
     this.testLog("Websocket déconnecté... Relancez l'application...", "FAIL");
-    alert("Relancez l'application...");
+    //alert("Relancez l'application...");
   }
 
   onChangeSettings(e) {
@@ -124,7 +209,14 @@ class App extends Component {
         />
       );
     } else if (this.state.currentTab === "Import") {
-      jsxTab = <ImportTab />;
+      jsxTab = (
+        <ImportTab
+          {...this.state}
+          addNewPath={this.addNewPath.bind(this)}
+          askForRemovingPath={this.askForRemovingPath.bind(this)}
+          askForPathMap={this.askForPathMap.bind(this)}
+        />
+      );
     }
 
     return (

@@ -64,5 +64,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	theModel.client = conn
 	go messangeHandling()
 	sendMessage(&Message{"settings change", theModel.Settings})
+	sendAllPaths()
 	write()
 }

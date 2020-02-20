@@ -10,8 +10,8 @@ import (
 	"googlemaps.github.io/maps"
 )
 
-// Request part
-func makeRequest() {
+func makeClient() (*maps.Client, error) {
+
 	// Creating the proyx URL
 	proxyURL, err := url.Parse(theModel.Settings.Proxy)
 	if err != nil {
@@ -23,7 +23,7 @@ func makeRequest() {
 				"message": "Erreur Proxy : Adresse invalide",
 			},
 		})
-		return
+		return nil, err
 	}
 
 	// Adding the proxy settings to the Transport object
@@ -49,6 +49,17 @@ func makeRequest() {
 				"message": "Erreur requête : Construction du client Maps impossible",
 			},
 		})
+		return nil, err
+	}
+
+	return c, nil
+}
+
+// Request part
+func makeRequest() {
+	c, err := makeClient()
+	if err != nil {
+		return
 	}
 
 	r := &maps.DistanceMatrixRequest{
@@ -87,4 +98,33 @@ func makeRequest() {
 	})
 
 	return
+}
+
+func makeDirectionRequest(infos *PathInfos) {
+	c, err := makeClient()
+	if err != nil {
+		return
+	}
+
+	origString := fmt.Sprintf("%v,%v", infos.Coordinates.Origin.Lat, infos.Coordinates.Origin.Long)
+	destString := fmt.Sprintf("%v,%v", infos.Coordinates.Destination.Lat, infos.Coordinates.Destination.Long)
+	r := &maps.DirectionsRequest{
+		Origin:      origString,
+		Destination: destString,
+	}
+
+	route, _, err := c.Directions(context.Background(), r)
+	if err != nil {
+		fmt.Println(err)
+
+		sendMessage(&Message{
+			Name: "test callback",
+			Data: map[string]string{
+				"type":    "FAIL",
+				"message": "Erreur requête chemin : Impossible d'effectuer la requête",
+			},
+		})
+	}
+
+	AddPath(infos, route)
 }
